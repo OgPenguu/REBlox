@@ -46,6 +46,7 @@ namespace reblox::memory {
 		return OpenProcess(PROCESS_ALL_ACCESS, FALSE, static_cast<DWORD>(pid));
 	}
 
+
 	inline auto get_module_base(std::wstring mod) -> std::uint64_t {
 		auto snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, state.pid);
 		std::uint64_t ret = 0;
@@ -66,16 +67,22 @@ namespace reblox::memory {
 		return ret;
 	}
 
-	inline auto attach_to_process( std::wstring process_name ) -> bool {
-		state.pid = get_pid( process_name );
-		if ( state.pid == 0 ) return false;
+	inline auto attach_to_process(std::wstring process_name) -> bool {
+		DWORD pid = get_pid(process_name);
+		state.pid = static_cast<std::int32_t>(pid);
+		state.proc = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
+		if (state.proc == nullptr) return false;
 
-		state.proc = open_process( state.pid );
-		if ( state.proc == nullptr ) return false;
+		state.process_base = get_module_base(process_name);
+		return state.process_base != 0;
+	}
 
-		state.process_base = get_module_base( process_name );
-		if ( state.process_base == 0 ) return false;
-
-		return true;
+	// UD Trust
+	std::string WStringToString(const std::wstring& wstr) {
+		if (wstr.empty()) return std::string();
+		int size_needed = WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), NULL, 0, NULL, NULL);
+		std::string strTo(size_needed, 0);
+		WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), &strTo[0], size_needed, NULL, NULL);
+		return strTo;
 	}
 }
