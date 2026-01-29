@@ -5,6 +5,8 @@
 #include "thirdparty/imgui/imgui_impl_win32.h"
 #include "thirdparty/imgui/imgui_impl_dx11.h"
 #include "src/memory/memory.h"
+#include "src/window/gui/gui.h"
+#include <algorithm>
 
 #pragma comment(lib, "d3d11.lib")
 
@@ -26,9 +28,9 @@ static int Selected_Index = -1;
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 {
-    WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0, 0, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, L"ImGui Example", NULL };
+    WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0, 0, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, L"REBlox", NULL };
     RegisterClassEx(&wc);
-    HWND hwnd = CreateWindow(wc.lpszClassName, L"Dear ImGui Example", WS_OVERLAPPEDWINDOW, 100, 100, 1280, 800, NULL, NULL, wc.hInstance, NULL);
+    HWND hwnd = CreateWindow(wc.lpszClassName, L"REBlox", WS_OVERLAPPEDWINDOW, 100, 100, 1280, 800, NULL, NULL, wc.hInstance, NULL);
 
     if (!CreateDeviceD3D(hwnd))
     {
@@ -60,22 +62,43 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
             continue;
         }
 
+        if (g_ResizeWidth != 0 && g_ResizeHeight != 0)
+        {
+            CleanupRenderTarget();
+            g_pSwapChain->ResizeBuffers(0, g_ResizeWidth, g_ResizeHeight, DXGI_FORMAT_UNKNOWN, 0);
+            g_ResizeWidth = g_ResizeHeight = 0;
+            CreateRenderTarget();
+        }
+
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
         ImGui::Begin("Main Window");
 
-        if (ImGui::Button("Select Process")) {
-            ShowProcessPicker = true;
-            ProcessList = reblox::memory::get_processes();
-        }
+        enum class _tab {
+            home,
+            memory
+        } static tab = _tab::home;
+        
+        if (ImGui::Button("Home")) tab = _tab::home;
+        sl;
+        if (ImGui::Button("Memory")) tab = _tab::memory;
 
-        if (reblox::memory::state.pid != 0) {
-            ImGui::Text("Attached to PID: %d", reblox::memory::state.pid);
-            ImGui::Text("Base Address: 0x%llX", reblox::memory::state.process_base);
-        }
-        else {
-            ImGui::Text("Status: Not Attached!!");
+        ImGui::Separator();
+
+        if (tab == _tab::home) {
+            if (ImGui::Button("Select Process")) {
+                ShowProcessPicker = true;
+                ProcessList = reblox::memory::get_processes();
+            }
+
+            if (reblox::memory::state.pid != 0) {
+                ImGui::Text("Attached to PID: %d", reblox::memory::state.pid);
+                ImGui::Text("Base Address: 0x%llX", reblox::memory::state.process_base);
+            }
+            else {
+                ImGui::Text("Status: Not Attached!!");
+            }
         }
 
         ImGui::End();
@@ -83,21 +106,31 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
         if (ShowProcessPicker) {
             ImGui::SetNextWindowSize(ImVec2(400, 500), ImGuiCond_FirstUseEver);
             if (ImGui::Begin("Select Process", &ShowProcessPicker)) {
+                static char searchBuffer[256] = "";
+                ImGui::SetNextItemWidth(-1);
+                ImGui::InputTextWithHint("##search", "Search processes...", searchBuffer, IM_ARRAYSIZE(searchBuffer));
 
                 ImGui::Separator();
                 if (ImGui::BeginChild("ProcessList", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() * 2.5f))) {
+                    std::string searchStr = searchBuffer;
+                    std::transform(searchStr.begin(), searchStr.end(), searchStr.begin(), ::tolower);
+
                     for (int n = 0; n < ProcessList.size(); n++) {
                         std::string name = reblox::memory::WStringToString(ProcessList[n].szExeFile);
                         std::string label = name + " (PID: " + std::to_string(ProcessList[n].th32ProcessID) + ")";
 
-                        bool Is_Selected = (Selected_Index == n);
-                        if (ImGui::Selectable(label.c_str(), Is_Selected)) {
-                            Selected_Index = n;
+                        if (searchStr.empty() ||
+                            (std::transform(name.begin(), name.end(), name.begin(), ::tolower),
+                            name.find(searchStr) != std::string::npos)) {
+
+                            bool Is_Selected = (Selected_Index == n);
+                            if (ImGui::Selectable(label.c_str(), Is_Selected)) {
+                                Selected_Index = n;
+                            }
                         }
                     }
                     ImGui::EndChild();
                 }
-
                 ImGui::Separator();
                 if (ImGui::Button("Attach") && Selected_Index != -1) {
                     if (reblox::memory::attach_to_process(ProcessList[Selected_Index].szExeFile)) {
@@ -115,12 +148,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
                 if (ImGui::Button("Cancel")) {
                     ShowProcessPicker = false;
                 }
-
                 ImGui::SameLine();
                 if (ImGui::Button("Refresh List")) {
                     ProcessList = reblox::memory::get_processes();
                 }
-
                 ImGui::End();
             }
         }
