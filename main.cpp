@@ -4,12 +4,13 @@
 #include "thirdparty/imgui/imgui.h"
 #include "thirdparty/imgui/imgui_impl_win32.h"
 #include "thirdparty/imgui/imgui_impl_dx11.h"
+#include "src/memory/memory.h"
 
 #pragma comment(lib, "d3d11.lib")
 
-ID3D11Device*           g_pd3dDevice = nullptr;
-ID3D11DeviceContext*    g_pd3dDeviceContext = nullptr;
-IDXGISwapChain*         g_pSwapChain = nullptr;
+ID3D11Device* g_pd3dDevice = nullptr;
+ID3D11DeviceContext* g_pd3dDeviceContext = nullptr;
+IDXGISwapChain* g_pSwapChain = nullptr;
 ID3D11RenderTargetView* g_mainRenderTargetView = nullptr;
 static UINT                     g_ResizeWidth = 0, g_ResizeHeight = 0;
 
@@ -18,6 +19,10 @@ bool CreateDeviceD3D(HWND hWnd);
 void CleanupDeviceD3D();
 void CreateRenderTarget();
 void CleanupRenderTarget();
+
+static bool ShowProcessPicker = false;
+static std::vector<reblox::memory::PE32> ProcessList;
+static int Selected_Index = -1;
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 {
@@ -58,10 +63,67 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
+        ImGui::Begin("Main Window");
 
-        ImGui::Begin("Hello, ImGui!");
-        ImGui::Text("This is a simple ImGui window");
+        if (ImGui::Button("Select Process")) {
+            ShowProcessPicker = true;
+            ProcessList = reblox::memory::get_processes();
+        }
+
+        if (reblox::memory::state.pid != 0) {
+            ImGui::Text("Attached to PID: %d", reblox::memory::state.pid);
+            ImGui::Text("Base Address: 0x%llX", reblox::memory::state.process_base);
+        }
+        else {
+            ImGui::Text("Status: Not Attached!!");
+        }
+
         ImGui::End();
+
+        if (ShowProcessPicker) {
+            ImGui::SetNextWindowSize(ImVec2(400, 500), ImGuiCond_FirstUseEver);
+            if (ImGui::Begin("Select Process", &ShowProcessPicker)) {
+
+                ImGui::Separator();
+                if (ImGui::BeginChild("ProcessList", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() * 2.5f))) {
+                    for (int n = 0; n < ProcessList.size(); n++) {
+                        std::string name = reblox::memory::WStringToString(ProcessList[n].szExeFile);
+                        std::string label = name + " (PID: " + std::to_string(ProcessList[n].th32ProcessID) + ")";
+
+                        bool Is_Selected = (Selected_Index == n);
+                        if (ImGui::Selectable(label.c_str(), Is_Selected)) {
+                            Selected_Index = n;
+                        }
+                    }
+                    ImGui::EndChild();
+                }
+
+                ImGui::Separator();
+                if (ImGui::Button("Attach") && Selected_Index != -1) {
+                    if (reblox::memory::attach_to_process(ProcessList[Selected_Index].szExeFile)) {
+                        ShowProcessPicker = false;
+                    }
+                    else {
+                        MessageBoxA(0, "Failed to attach! Try Running as Admin.", "Error!", 0);
+                        reblox::memory::state.pid = 0;
+                        reblox::memory::state.proc = nullptr;
+                        reblox::memory::state.process_base = 0;
+                        ProcessList = reblox::memory::get_processes();
+                    }
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Cancel")) {
+                    ShowProcessPicker = false;
+                }
+
+                ImGui::SameLine();
+                if (ImGui::Button("Refresh List")) {
+                    ProcessList = reblox::memory::get_processes();
+                }
+
+                ImGui::End();
+            }
+        }
 
         // Rendering
         ImGui::Render();
@@ -100,9 +162,9 @@ bool CreateDeviceD3D(HWND hWnd)
     sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
 
     if (D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0,
-                                      nullptr, 0, D3D11_SDK_VERSION, &sd,
-                                      &g_pSwapChain, &g_pd3dDevice,
-                                      nullptr, &g_pd3dDeviceContext) != S_OK)
+        nullptr, 0, D3D11_SDK_VERSION, &sd,
+        &g_pSwapChain, &g_pd3dDevice,
+        nullptr, &g_pd3dDeviceContext) != S_OK)
         return false;
 
     CreateRenderTarget();
