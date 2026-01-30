@@ -211,11 +211,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 				// Handling shortcuts
 				//if (!io.WantTextInput)
 				{
-					if (ImGui::IsKeyPressed(ImGuiKey_K) && ImGui::GetIO().KeyCtrl)
+					if (ImGui::IsKeyPressed(ImGuiKey_K) && ImGui::GetIO().KeyAlt)
 					{
 						reblox::gui_shortcuts::focusOnProcessPicker = true;
 					}
-					if (ImGui::IsKeyPressed(ImGuiKey_A) && ImGui::GetIO().KeyCtrl)
+					if (ImGui::IsKeyPressed(ImGuiKey_A) && ImGui::GetIO().KeyAlt)
 					{
 						reblox::gui_shortcuts::attachShortcutPressed = true;
 					}
@@ -234,7 +234,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 					reblox::gui_shortcuts::focusOnProcessPicker = false;
 				}
 
-				ImGui::InputTextWithHint("##search", "Search processes (Ctrl + K = focus)", searchBuffer, IM_ARRAYSIZE(searchBuffer));
+				ImGui::InputTextWithHint("##search", "Search processes (Alt + K = focus)", searchBuffer, IM_ARRAYSIZE(searchBuffer));
 
 				static constexpr size_t bottomPadding = 31;
 
@@ -278,7 +278,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 
 				ImGui::SetCursorPosY(ImGui::GetCursorPosY() + bottomPadding);
 				ImGui::Separator();
-				if ((ImGui::Button("Attach (Ctrl + A)") || reblox::gui_shortcuts::attachShortcutPressed) && selectedIndex != -1)
+				if ((ImGui::Button("Attach (Alt + A)") || reblox::gui_shortcuts::attachShortcutPressed) && selectedIndex != -1)
 				{
 					reblox::gui_shortcuts::attachShortcutPressed = false;
 
