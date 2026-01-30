@@ -245,7 +245,27 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 					std::string searchStr = searchBuffer;
 					std::transform(searchStr.begin(), searchStr.end(), searchStr.begin(), ::tolower);
 
-					int firstVisibleIndex = -1;
+					if (autoSelectPending)
+					{
+						int firstVisibleIndex = -1;
+						for (int n = 0; n < ProcessList.size(); n++)
+						{
+							std::string name = reblox::memory::WStringToString(ProcessList[n].szExeFile);
+							std::string lowerName = name;
+							std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
+
+							if (searchStr.empty() || lowerName.find(searchStr) != std::string::npos)
+							{
+								firstVisibleIndex = n;
+								break;
+							}
+						}
+
+						if (firstVisibleIndex != -1)
+							selectedIndex = firstVisibleIndex;
+
+						autoSelectPending = false;
+					}
 
 					for (int n = 0; n < ProcessList.size(); n++)
 					{
@@ -255,22 +275,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 
 						if (searchStr.empty() || lowerName.find(searchStr) != std::string::npos)
 						{
-							if (firstVisibleIndex == -1)
-								firstVisibleIndex = n;
-
 							bool isSelected = (selectedIndex == n);
 							if (ImGui::Selectable((name + " (PID: " + std::to_string(ProcessList[n].th32ProcessID) + ")").c_str(), isSelected))
 							{
 								selectedIndex = n;
-								autoSelectPending = false;
 							}
-						}
-					}
 
-					if (autoSelectPending && firstVisibleIndex != -1)
-					{
-						selectedIndex = firstVisibleIndex;
-						autoSelectPending = false;
+							if (isSelected)
+								ImGui::SetScrollHereY();
+						}
 					}
 
 					ImGui::EndChild();
