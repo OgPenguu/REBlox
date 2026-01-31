@@ -17,6 +17,7 @@ namespace reblox
 		};
 
 		static bool addOffsets;
+		static bool deepenOffsets;
 		static std::vector<uintptr_t> relativeOffsets;
 		static uintptr_t baseReadWriteAddress; // like in cheat engine when you add the offsets it needs a base
 		static ReadWriteType readWriteType;

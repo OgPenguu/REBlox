@@ -9,6 +9,7 @@
 #include "src/window/gui/gui.h"
 #include <algorithm>
 #include "globals/reblox.h"
+#include <magic_enum/magic_enum.hpp>
 
 #undef min
 #undef max
@@ -170,6 +171,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 
 				if (reblox::memory::addOffsets)
 				{
+					ImGui::Checkbox("Deepen Offsets", &reblox::memory::deepenOffsets);
+					if (ImGui::BeginItemTooltip())
+					{
+						ImGui::Text("Read every offset and add the next offset into the readen address");
+						ImGui::EndTooltip();
+					}
+
 					static uintptr_t offsetValue = 0;
 					ImGui::InputScalar("Offset", ImGuiDataType_U64, &offsetValue, nullptr, nullptr, "%p");
 					if (ImGui::Button("Add offset"))
@@ -187,11 +195,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 						reblox::memory::relativeOffsets.clear();
 					}
 
+					// Displaying them
 					if (!reblox::memory::relativeOffsets.empty())
 					{
-						int listBoxHeight = std::min((int)reblox::memory::relativeOffsets.size(), 7) * 20;
+						int itemsToShow = std::min((int)reblox::memory::relativeOffsets.size(), 7);
+						float itemHeight = ImGui::GetTextLineHeightWithSpacing() + 1;
+						float listBoxHeight = itemsToShow * itemHeight;
 
-						ImGui::BeginListBox("##Offsets", ImVec2(0, listBoxHeight));
+						ImGui::BeginListBox("##Offsets", ImVec2(0, listBoxHeight ));
 
 						for (size_t i = 0; i < reblox::memory::relativeOffsets.size(); ++i)
 						{
@@ -204,9 +215,68 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 				ImGui::Dummy(ImVec2(0, 2));
 			}
 
+			// Selecting read/write type
+			{
+				constexpr auto rwNames = magic_enum::enum_names<reblox::memory::ReadWriteType>();
+				static std::array<const char*, rwNames.size()> rwNamesCStr{};
+				for (size_t i = 0; i < rwNames.size(); ++i) rwNamesCStr[i] = rwNames[i].data();
+
+				int current = static_cast<int>(reblox::memory::readWriteType);
+				if (ImGui::Combo("Memory Size", &current, rwNamesCStr.data(), (int)rwNamesCStr.size()))
+				{
+					reblox::memory::readWriteType = static_cast<reblox::memory::ReadWriteType>(current);
+				}
+			}
+
+			static std::string readText;
+			static uintptr_t finalAddress = reblox::memory::baseReadWriteAddress;
 			if (ImGui::Button("Read"))
 			{
+				finalAddress = reblox::memory::baseReadWriteAddress;
 
+				if (reblox::memory::addOffsets && reblox::memory::deepenOffsets)
+				{
+					for (size_t i = 0; i < reblox::memory::relativeOffsets.size(); ++i)
+					{
+						finalAddress = reblox::memory::read_memory<uintptr_t>(finalAddress);
+						finalAddress += reblox::memory::relativeOffsets[i];
+					}
+				}
+				else if (reblox::memory::addOffsets)
+				{
+					for (uintptr_t offset : reblox::memory::relativeOffsets)
+						finalAddress += offset;
+				}
+
+				// Read based on selected type
+				switch (reblox::memory::readWriteType)
+				{
+				case reblox::memory::ReadWriteType::Float:
+					readText = std::to_string(reblox::memory::read_memory<float>(finalAddress));
+					break;
+				case reblox::memory::ReadWriteType::Int:
+					readText = std::to_string(reblox::memory::read_memory<int>(finalAddress));
+					break;
+				case reblox::memory::ReadWriteType::Double:
+					readText = std::to_string(reblox::memory::read_memory<double>(finalAddress));
+					break;
+				case reblox::memory::ReadWriteType::Unsigned_Int:
+					readText = std::to_string(reblox::memory::read_memory<unsigned int>(finalAddress));
+					break;
+				case reblox::memory::ReadWriteType::Uintptr_t:
+				{
+					uintptr_t value = reblox::memory::read_memory<uintptr_t>(finalAddress);
+					char buf[32];
+					snprintf(buf, sizeof(buf), "0x%llX", value);
+					readText = buf;
+					break;
+				}
+				}
+			}
+
+			if (!readText.empty())
+			{
+				ImGui::Text("Read (0x%llX): %s", finalAddress, readText.c_str());
 			}
 		}
 
@@ -233,7 +303,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 					{
 						reblox::gui_shortcuts::focusOnProcessPicker = true;
 					}
-					if (ImGui::IsKeyPressed(ImGuiKey_A) && ImGui::GetIO().KeyAlt)
+					if ((ImGui::IsKeyPressed(ImGuiKey_A) && ImGui::GetIO().KeyAlt) || ImGui::IsKeyPressed(ImGuiKey_Enter))
 					{
 						reblox::gui_shortcuts::attachShortcutPressed = true;
 					}
